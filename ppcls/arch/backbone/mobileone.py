@@ -1,7 +1,24 @@
-"""
-This Code was based on https://github.com/apple/ml-mobileone/blob/main/mobileone.py
-"""
+# copyright (c) 2020 PaddlePaddle Authors. All Rights Reserve.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
+# This Code was based on https://github.com/apple/ml-mobileone/blob/main/mobileone.py
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import copy
 import paddle
 import paddle.nn as nn
 from paddle import ParamAttr
@@ -41,8 +58,7 @@ class SEBlock(nn.Layer):
     """ 
     Squeeze and Excite module.
     """
-
-    def __init__(self, in_channels, rd_ratio=0.0625) -> None:
+    def __init__(self, in_channels, rd_ratio=0.0625):
         """ 
         Construct a Squeeze and Excite Module.
         Args:
@@ -82,7 +98,6 @@ class MobileOneBlock(nn.Layer):
     This block has a multi-branched architecture at train-time
     and plain-CNN style architecture at inference time
     """
-
     def __init__(self,
                  in_channels,
                  out_channels,
@@ -135,7 +150,7 @@ class MobileOneBlock(nn.Layer):
                     self.in_channels,
                     self.out_channels,
                     self.kernel_size,
-                    stride=stride,
+                    stride=self.stride,
                     groups=self.groups))
 
         # Re-parameterizable scale branch
@@ -145,7 +160,7 @@ class MobileOneBlock(nn.Layer):
                 self.in_channels,
                 self.out_channels,
                 1,
-                stride=stride,
+                stride=self.stride,
                 groups=self.groups)
 
     def forward(self, x):
@@ -179,14 +194,13 @@ class MobileOneBlock(nn.Layer):
         if hasattr(self, 'reparam_conv'):
             return
         kernel, bias = self._get_kernel_bias()
-        self.reparam_conv = nn.Conv2d(
-            in_channels=self.rbr_conv[0].conv.in_channels,
-            out_channels=self.rbr_conv[0].conv.out_channels,
-            kernel_size=self.rbr_conv[0].conv.kernel_size,
-            stride=self.rbr_conv[0].conv.stride,
-            padding=self.rbr_conv[0].conv.padding,
-            groups=self.rbr_conv[0].conv.groups,
-            bias_attr=True)
+        self.reparam_conv = nn.Conv2D(
+            in_channels=self.in_channels,
+            out_channels=self.out_channels,
+            kernel_size=self.kernel_size,
+            stride=self.stride,
+            padding=(self.kernel_size - 1) // 2,
+            groups=self.groups)
         self.reparam_conv.weight.set_value(kernel)
         self.reparam_conv.bias.set_value(bias)
 
@@ -240,11 +254,11 @@ class MobileOneBlock(nn.Layer):
             fused_bias = []
             for block in branch:
                 kernel = block.conv.weight
-                running_mean = block.norm._mean
-                running_var = block.norm._variance
-                gamma = block.norm.weight
-                beta = block.norm.bias
-                eps = block.norm._epsilon
+                running_mean = block.bn._mean
+                running_var = block.bn._variance
+                gamma = block.bn.weight
+                beta = block.bn.bias
+                eps = block.bn._epsilon
 
                 std = (running_var + eps).sqrt()
                 t = (gamma / std).reshape((-1, 1, 1, 1))
@@ -254,13 +268,13 @@ class MobileOneBlock(nn.Layer):
 
             return sum(fused_kernels), sum(fused_bias)
 
-        elif isinstance(branch, ConvNormLayer):
+        elif isinstance(branch, ConvBNLayer):
             kernel = branch.conv.weight
-            running_mean = branch.norm._mean
-            running_var = branch.norm._variance
-            gamma = branch.norm.weight
-            beta = branch.norm.bias
-            eps = branch.norm._epsilon
+            running_mean = branch.bn._mean
+            running_var = branch.bn._variance
+            gamma = branch.bn.weight
+            beta = branch.bn.bias
+            eps = branch.bn._epsilon
         else:
             assert isinstance(branch, nn.BatchNorm2D)
             input_dim = self.in_channels if self.kernel_size == 1 else 1
@@ -293,20 +307,20 @@ class MobileOneBlock(nn.Layer):
 
 
 class MobileOneNet(nn.Layer):
-    """ MobileOne Model
-        PaddlePaddle implementation of `An Improved One millisecond Mobile Backbone`
-        https://arxiv.org/pdf/2206.04040.pdf
+    """ 
+    PaddlePaddle implementation of `An Improved One millisecond Mobile Backbone`
+    https://arxiv.org/pdf/2206.04040.pdf
     """
-
     def __init__(self,
-                 num_classes=1000,
+                 class_num=1000,
                  num_blocks_per_stage=[2, 8, 10, 1],
                  width_multipliers=[0.75, 1.0, 1.0, 2.0],
                  use_se=False,
                  num_conv_branches=1):
-        """ Construct MobileOne model.
+        """
+        Construct MobileOne model.
         Args:
-            num_classes: Number of classes in the dataset.
+            class_num: Number of classes in the dataset.
             num_blocks_per_stage: List of number of blocks per stage.
             width_multipliers: List of width multiplier for blocks in a stage.
             use_se: Whether to use SE-ReLU activations.
@@ -341,7 +355,7 @@ class MobileOneNet(nn.Layer):
             num_blocks_per_stage[3],
             num_se_blocks=num_blocks_per_stage[3] if use_se else 0)
         self.gap = nn.AdaptiveAvgPool2D(output_size=1)
-        self.linear = nn.Linear(int(512 * width_multipliers[3]), num_classes)
+        self.linear = nn.Linear(int(512 * width_multipliers[3]), class_num)
 
     def _make_stage(self, planes, num_blocks, num_se_blocks=0):
         """ 
@@ -418,32 +432,27 @@ PARAMS = {
 }
 
 
-def MobileOne(num_classes=1000, variant="s0"):
-    """Get MobileOne model.
-    num_classes: Number of classes in the dataset.
-    variant: Which type of model to generate.
-    :return: MobileOne model. """
+def MobileOne(class_num=1000, variant="s0"):
+    """
+    Get MobileOne model.
+    Args:
+        class_num(int): Number of classes in the dataset.
+        variant(str): Which type of model to generate.
+    """
     variant_params = PARAMS[variant]
-    return MobileOneNet(num_classes=num_classes, **variant_params)
+    return MobileOneNet(class_num=class_num, **variant_params)
 
 
-def reparameterize_model(model, input=None, output=None):
+def MobileOne_S0(pretrained=False, use_ssld=False, **kwargs):
+    variant_params = PARAMS["s0"]
+    model = MobileOneNet(**variant_params, **kwargs)
+    return model
+
+
+def reparameterize_model(model):
     # Avoid editing original graph
     model = copy.deepcopy(model)
     for layer in model.sublayers():
         if hasattr(layer, 'convert_to_deploy'):
             layer.convert_to_deploy()
     return model
-    # print('swith done. Checking....')
-    # deploy_model = MobileOne_S0(deploy=True)
-    # deploy_model.eval()
-    # deploy_model.load_state_dict(model.state_dict())
-    # if input is not None:
-    #     o = deploy_model(x)
-    #     print((output - o).sum())
-    # return deploy_model
-
-
-if __name__ == '__main__':
-    model = MobileOne()
-    print(paddle.summary(model, (1, 3, 224, 224)))
