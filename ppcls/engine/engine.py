@@ -447,6 +447,13 @@ class Engine(object):
     def eval(self, epoch_id=0):
         assert self.mode in ["train", "eval"]
         self.model.eval()
+
+        if "rep" in self.config["Global"] and self.config["Global"]["rep"]:
+            for layer in self.model.sublayers():
+                if hasattr(layer, 'convert_to_deploy'):
+                    layer.convert_to_deploy()
+            print(paddle.summary(self.model, (1,3,224,224)))
+
         eval_result = self.eval_func(self, epoch_id)
         self.model.train()
         return eval_result
@@ -511,8 +518,8 @@ class Engine(object):
 
         # for rep nets
         for layer in self.model.sublayers():
-            if hasattr(layer, "rep") and not getattr(layer, "is_repped"):
-                layer.rep()
+            if hasattr(layer, 'convert_to_deploy'):
+                layer.convert_to_deploy()
 
         save_path = os.path.join(self.config["Global"]["save_inference_dir"],
                                  "inference")

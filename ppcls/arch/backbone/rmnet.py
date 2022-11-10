@@ -330,7 +330,7 @@ class MobileOneBlock(nn.Layer):
         return kernel * t, beta - running_mean * gamma / std
 
 
-class MobileOneNet(nn.Layer):
+class RMNet(nn.Layer):
     """ 
     PaddlePaddle implementation of `An Improved One millisecond Mobile Backbone`
     https://arxiv.org/pdf/2206.04040.pdf
@@ -352,7 +352,7 @@ class MobileOneNet(nn.Layer):
             use_se: Whether to use SE-ReLU activations.
             num_conv_branches: Number of linear conv branches.
         """
-        super(MobileOneNet, self).__init__()
+        super(RMNet, self).__init__()
         assert len(width_multipliers) == 5
         self.in_planes = min(64, int(64 * width_multipliers[0]))
         self.use_se = use_se
@@ -477,44 +477,8 @@ PARAMS = {
 }
 
 
-def MobileOne(class_num=1000, variant="s0"):
-    """
-    Get MobileOne model.
-    Args:
-        class_num(int): Number of classes in the dataset.
-        variant(str): Which type of model to generate.
-    """
-    variant_params = PARAMS[variant]
-    return MobileOneNet(class_num=class_num, **variant_params)
-
-def MobileOne_S0(pretrained=False, use_ssld=False, **kwargs):
-    variant_params = PARAMS["s0"]
-    model = MobileOneNet(**variant_params, **kwargs)
-    return model
-
-def MobileOne_Me(pretrained=False, use_ssld=False, **kwargs):
-    model = MobileOneNet(
-                 class_num=1000,
-                 num_blocks_per_stage=[2, 2, 6, 2],
-                 width_multipliers=[0.5, 1.0, 1.0, 1.0, 1.0],
-                 use_se=False,
-                 kernel_size=5,
-                 num_conv_branches=4)
-    return model
-
-def MobileOne_Me1(pretrained=False, use_ssld=False, **kwargs):
-    model = MobileOneNet(
-                 class_num=1000,
-                 num_blocks_per_stage=[2, 4, 6, 2],
-                 width_multipliers=[0.5, 1.0, 1.0, 1.0, 1.0],
-                 use_se=False,
-                 kernel_size=5,
-                 use_last_conv=True,
-                 num_conv_branches=4)
-    return model
-
-def MobileOne_Me2(pretrained=False, use_ssld=False, **kwargs):
-    model = MobileOneNet(
+def RMNet_1x(pretrained=False, use_ssld=False, **kwargs):
+    model = RMNet(
                  class_num=1000,
                  num_blocks_per_stage=[2, 4, 6, 2],
                  width_multipliers=[0.5, 1.0, 1.0, 0.875, 0.75],
@@ -523,6 +487,7 @@ def MobileOne_Me2(pretrained=False, use_ssld=False, **kwargs):
                  use_last_conv=True,
                  num_conv_branches=6)
     return model
+
 
 def reparameterize_model(model):
     # Avoid editing original graph

@@ -13,10 +13,12 @@ Global:
   # used for static mode and model export
   image_shape: [3, 224, 224]
   save_inference_dir: ./inference
+  # Turn this option on only when evaluating
+  rep: False
 
 # model architecture
 Arch:
-  name: MobileOne_S0
+  name: RMNet_1x
   class_num: 1000
  
 # loss function config for traing/eval process
@@ -38,7 +40,7 @@ Optimizer:
     warmup_epoch: 5
   regularizer:
     name: 'L2'
-    coeff: 0.00002
+    coeff: 0.00003
 
 
 # data loader for train and eval
@@ -56,7 +58,7 @@ DataLoader:
             size: 224
         - RandFlipImage:
             flip_code: 1
-        - AutoAugment:
+        #- AutoAugment:
         - NormalizeImage:
             scale: 1.0/255.0
             mean: [0., 0., 0.]

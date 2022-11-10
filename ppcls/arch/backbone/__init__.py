@@ -14,5 +14,6 @@
 
 
 from .mobileone import MobileOne_S0
-from .mobileone_new import MobileOne_Me
+from .mobileone_new import MobileOne_Me, MobileOne_Me1
+from .rmnet import RMNet_1x
 
