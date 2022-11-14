@@ -33,3 +33,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python3.7 -m paddle.distributed.launch --log_dir=lo
 ```
 python eval.py -c  configs/MobileOne/MobileOne.yaml
 ```
+
+## Export
+
+```
+python3.7 export_model.py -c configs/MobileOne/MobileOne_S0.yaml -o Global.pretrained_model=mobileone_s0 -o Global.save_inference_dir=outpu
+```
