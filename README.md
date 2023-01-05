@@ -1,11 +1,13 @@
-# paddle_mobileone
-PaddlePaddle implementation of [MobileOne](https://arxiv.org/abs/2206.04040). This repo is built on the basis of [PaddleClas](https://github.com/PaddlePaddle/PaddleClas) framework.
+# paddle_reparameterization
+PaddlePaddle implementation of Re-parameterization. This repo is built on the basis of [PaddleClas](https://github.com/PaddlePaddle/PaddleClas) framework.
 
 ## Benchmark
 
 | Model | Acc Top1 | Download |
 | ----- | -------- | -------- |
 | MobileOne-S0 | 70.30 | [Link](https://pan.baidu.com/s/1c6mhRyVKiLrf4H4lbwpS-g)  extract:`3him` |
+
+- MobileOne refers to the [paper](https://arxiv.org/abs/2206.04040)
 
 ## Prepare
 
